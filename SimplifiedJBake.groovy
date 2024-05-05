@@ -1,28 +1,30 @@
 @Grab(group='org.asciidoctor', module='asciidoctorj', version='2.4.3')
 import org.asciidoctor.Asciidoctor
+import org.asciidoctor.Attributes
 import org.asciidoctor.OptionsBuilder
 import groovy.text.SimpleTemplateEngine
+import groovy.transform.CompileStatic
 
 // Placeholder for storing rendered pages
 def renderedPages = []
 
 // Entry point of the script
-def main(args) {
+def run(args) {
     if (args.length == 0) {
         println "Please provide the directory path containing .adoc files"
         return
     }
-
-    def adocFiles = findAsciidocFiles(args[0])
-
-    // Render each Asciidoc file to HTML and store in the list
-    renderAsciidocFiles(adocFiles)
 
     // Assuming a build directory in the current working directory
     def buildDir = new File('build')
     if (!buildDir.exists()) {
         buildDir.mkdirs()
     }
+
+    def adocFiles = findAsciidocFiles(args[0])
+    println adocFiles
+    // Render each Asciidoc file to HTML and store in the list
+    renderedPages = renderAsciidocFiles(adocFiles)
 
     // Write rendered HTML files to the build directory
     writeHtmlFiles(buildDir)
@@ -31,6 +33,7 @@ def main(args) {
 def findAsciidocFiles(String directoryPath) {
     def adocFiles = []
     def directory = new File(directoryPath)
+    println directory.canonicalPath
     directory.traverse(type: groovy.io.FileType.FILES, nameFilter: ~/.*\.adoc$/) { file ->
         adocFiles << file
     }
@@ -38,37 +41,67 @@ def findAsciidocFiles(String directoryPath) {
 }
 
 def renderAsciidocFiles(List<File> files) {
-    Asciidoctor asciidoctor = Asciidoctor.Factory.create()
+    def asciidoctor = Asciidoctor.Factory.create()
+    def options = OptionsBuilder.options()
+                                .attributes([test:'yo'])
+                                .toFile(false)
+                                .get()
+    renderedPages = []
+    println "Convert AsciiDoc"
     files.each { File file ->
-        def htmlContent = asciidoctor.convertFile(file, OptionsBuilder.options().toFile(false))
-        renderedPages << [path: file.path, content: htmlContent] 
+        println file.canonicalPath
+        def htmlContent = asciidoctor.convertFile(file, options)
+        def docAttributes = parseAttributes(file.text)
+        renderedPages << [path: file.path, content: htmlContent, attributes: docAttributes] 
     }
+    asciidoctor.shutdown()
+    return renderedPages
 }
 
 def writeHtmlFiles(File buildDir) {
     renderedPages.each { page ->
         def htmlFile = new File(buildDir, page.path.replaceFirst(/.*\/|\.adoc$/, '') + '.html')
-        htmlFile.text = processTemplate(page.content)
+        htmlFile.text = processWithTemplate(page.content, renderedPages)
     }
 }
 
-def processTemplate(String content) {
+def processWithTemplate(String content, List renderedPages) {
+    // Path to the template file
+    def templatePath = 'site/templates/page.gsp'
+    def templateContent = new File(templatePath).text
+    templateContent = expandIncludes(templateContent)
+
     def engine = new SimpleTemplateEngine()
-    def script = engine.createTemplate(content).make()
-    return expandIncludes(script.toString())
+    def binding = ['content': content, 'renderedPages': renderedPages]
+    def template = engine.createTemplate(templateContent).make(binding)
+
+    return template.toString()
 }
 
 def expandIncludes(String content) {
-    def pattern = /<%\s*include\s*"(.+?)"\s*%>/
-    while (content ==~ pattern) {
-        content = content.replaceAll(pattern) { match ->
-            def includePath = match[1]
-            def file = new File(includePath)
-            if (!file.exists()) throw new FileNotFoundException("Included file $includePath not found")
-            file.text
+
+    def pattern = /<%\s*include\s*\"(.+?)\"\s*%>/
+    def matcher = content =~ pattern
+    def baseDir = new File('site/templates')
+
+    matcher.each { fullMatch, fileName ->
+        File includeFile = new File(baseDir, fileName)
+        if (!includeFile.exists()) {
+            println "Include-File $fileName not found."
+        } else {
+            String fileContent = includeFile.text
+            content = content.replace(fullMatch, fileContent)
         }
     }
     return content
 }
-
-main(args)
+def parseAttributes(String content) {
+    def pattern = /:(\S+):\s*(.+)/
+    def matcher = content =~ pattern
+    def attributes = [:]
+    matcher.each { fullMatch, key, value ->
+        attributes[key] = value
+    }
+    return attributes
+}
+run(args)
