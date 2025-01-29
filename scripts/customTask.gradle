@@ -1,0 +1,8 @@
+task customTask (
+        description: 'a custom task',
+        group: 'docToolchain'
+) {
+    doLast {
+        println "your own custom task"
+    }
+}

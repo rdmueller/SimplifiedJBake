@@ -1,0 +1,88 @@
+= SimplifiedJBake Diagramme
+
+== Klassendiagramm
+
+[plantUML]
+****
+a->b
+****
+
+[plantuml, format=svg, type=plantuml]
+----
+@startuml
+class SimplifiedJBake {
+    // Attributes
+    - renderedPages
+    - includesCache
+    - config
+    - targetDir
+    - sourceFolder
+    - logger
+
+    // Methods
+    + main(String[] args)
+    - copyTextFiles(File sourceDir, File targetDir)
+    - renderHeader(String fileName, Map jbake)
+    - parseAsciiDocAttribs(String origText, Map jbake)
+    - parseOtherAttribs(String origText, Map jbake)
+    - fixMetaDataHeader()
+    - run(String[] args)
+    - findAsciidocFiles(File baseDir)
+    - renderAsciidocFiles(File baseDir, List<File> files, Map config)
+    - writeHtmlFiles(File buildDir, Map config)
+    - processWithTemplate(Map content, Map attributes, List renderedPages, Map config)
+    - expandIncludes(String content, int step)
+    - parseAttributes(String content)
+    - copyFolder(String source, String dest)
+}
+@enduml
+----
+
+== Sequenzdiagramm
+
+[plantuml, format=svg, type=plantuml]
+----
+@startuml
+actor User
+participant SimplifiedJBake
+participant File
+
+User -> SimplifiedJBake: run(args)
+SimplifiedJBake -> File: new File("docToolchainConfig.groovy")
+SimplifiedJBake -> ConfigSlurper: new ConfigSlurper()
+SimplifiedJBake -> ConfigSlurper: parse(configFile.text)
+SimplifiedJBake -> File: new File(args[0])
+SimplifiedJBake -> File: new File(targetDir, 'microsite/output')
+SimplifiedJBake -> File: mkdirs()
+SimplifiedJBake -> File: new File(targetDir, '/microsite/tmp/site/doc')
+SimplifiedJBake -> File: mkdirs()
+SimplifiedJBake -> SimplifiedJBake: copyTextFiles(baseDir, tmpFolder)
+SimplifiedJBake -> SimplifiedJBake: copyFolder("src/site/assets", buildDir.canonicalPath)
+SimplifiedJBake -> SimplifiedJBake: findAsciidocFiles(baseDir)
+SimplifiedJBake -> SimplifiedJBake: fixMetaDataHeader()
+SimplifiedJBake -> SimplifiedJBake: renderAsciidocFiles(baseDir, adocFiles, config)
+SimplifiedJBake -> SimplifiedJBake: writeHtmlFiles(buildDir, config)
+@enduml
+----
+
+== Aktivitätsdiagramm
+
+[plantuml, format=svg, type=plantuml]
+----
+@startuml
+start
+:Initialize Asciidoctor;
+:Initialize attributes and options;
+:Initialize renderedPages;
+:Print "Convert AsciiDoc";
+repeat
+    :Get next file;
+    :Convert file to HTML;
+    :Read document header;
+    :Parse attributes;
+    :Add to renderedPages;
+repeat while (more files?)
+:Shutdown Asciidoctor;
+stop
+@enduml
+----

@@ -1,3 +1,9 @@
+:jbake-status: published
+:jbake-order: 1
+:jbake-type: page_toc
+:jbake-menu: test
+:jbake-title: test
+
 == Überschrift
 
 Lorem Ipsum
